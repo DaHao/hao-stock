@@ -1,8 +1,9 @@
 'use strict';
-// const crawler = require('@waynechang65/ptt-crawler');
-// const crawler = require('./crawler');
+require('dotenv').config();
+
 const Crawler = require('crawler');
 const HTMLParser = require('node-html-parser');
+const axios = require('axios');
 
 const c = new Crawler({
     maxConnections: 1,
@@ -10,15 +11,22 @@ const c = new Crawler({
 	  rateLimit: 500,
 });
 
-function ParsePtt(error, res, done) {
-    if (error) return error;
+function parsePtt(content) {
+  const root = HTMLParser.parse(content);
+  const nextPages = root.querySelectorAll('.btn-group-paging > a');
+  const nextPage = nextPages.find(elem => elem.text.includes('上頁'));
+  const titles = root.querySelectorAll('.title > a');
 
-    const root = HTMLParser.parse(res.body);
-    const titles = root.querySelectorAll('.title > a');
-    titles.forEach(t => console.log(t.toString()));
-    console.log('------------------');
-
-    done();
+  return {
+    nextUrl: `https://www.ptt.cc${nextPage.getAttribute('href')}`,
+    targets: titles.reduce((accu, t) => {
+      if (t.text?.includes('[標的]')) {
+        const url = `https://www.ptt.cc${t.getAttribute('href')}`;
+        accu.push({ url, title: t.text });
+      }
+      return accu;
+    }, []),
+  }
 }
 
 function handleCrawl(uri) {
@@ -27,63 +35,34 @@ function handleCrawl(uri) {
       uri,
       skipEventRequest: false,
       callback: (error, res) => {
-        const root = HTMLParser.parse(res.body);
-        const titles = root.querySelectorAll('.title > a');
-        titles.forEach(t => console.log(t.toString()));
+        if (error) reject(error);
+        else resolve(parsePtt(res.body));
       },
     });
   });
 }
 
-handleCrawl('https://www.ptt.cc/bbs/Stock/index.html');
-
-// Queue just one URL, with default callback
-/*
-c.queue([
-  'https://www.ptt.cc/bbs/Stock/index.html',
-]);
-*/
-
-// Queue a list of URLs
-// c.queue(['http://www.google.com/','http://www.yahoo.com']);
-
-// Queue URLs with custom callbacks & parameters
-/*
-c.queue([{
-    uri: 'https://www.ptt.cc/bbs/Stock/index.html',
-    jQuery: false,
-
-    // The global callback won't be called
-    callback: (error, res, done) => {
-        if (error) {
-            console.log(error);
-        } else {
-          // console.log('Grabbed', res.body);
-          const root = HTMLParser.parse(res.body);
-          console.log(root.toString());
-          const titles = root.querySelectorAll('.title > a');
-          titles.forEach(t => console.log(t.toString()));
-          const soup = new JSSoup(res.body);
-          const elements = soup.select('div > .class1');
-          // const aTag = soup.findAll('a');
-          elements.forEach(t => console.log(t.text));
-        }
-        done();
-    }
-}]);
-*/
-
-async function getPttStock() {
-	await crawler.initialize();
-
-	const board = 'Stock';
-	const pages = 2;
-
-	const ptt = await crawler.getResults({
-		board,
-		pages,
-		skipPBs: true,
-	});
-
-	console.log(ptt);
+function sendMessage(message) {
+  axios.post(
+    `https://maker.ifttt.com/trigger/${process.env.event}/with/key/${process.env.token}`,
+    { value1: message },
+  );
 }
+
+async function main() {
+  let url = 'https://www.ptt.cc/bbs/Stock/index.html';
+
+  const result = [];
+
+  while(result.length < 10) {
+    const content = await handleCrawl(url);
+
+    url = content.nextUrl;
+    result.push(...content.targets);
+  }
+
+  const message = result.map(item => `${item.title}: ${item.url}<br/>`).join('<br/>');
+  // sendMessage(message);
+}
+
+main();
