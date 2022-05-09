@@ -15,17 +15,28 @@ function parsePtt(content) {
   const root = HTMLParser.parse(content);
   const nextPages = root.querySelectorAll('.btn-group-paging > a');
   const nextPage = nextPages.find(elem => elem.text.includes('上頁'));
-  const titles = root.querySelectorAll('.title > a');
+
+  const posts = root.querySelectorAll('.r-ent');
+  const targets = posts.reduce((accu, post) => {
+    const title = post.querySelector('.title > a');
+    const titleText = title?.text;
+
+    if (titleText?.includes('[標的]')) {
+      const titleUrl = title?.getAttribute('href');
+      const rank = post.querySelector('.nrec > span');
+      console.log(`[${rank?.text}]`, titleText, ':', titleUrl);
+      accu.push({
+        rank: rank?.text,
+        url: titleUrl,
+        title: titleText,
+      });
+    }
+    return accu;
+  }, []);
 
   return {
     nextUrl: `https://www.ptt.cc${nextPage.getAttribute('href')}`,
-    targets: titles.reduce((accu, t) => {
-      if (t.text?.includes('[標的]')) {
-        const url = `https://www.ptt.cc${t.getAttribute('href')}`;
-        accu.push({ url, title: t.text });
-      }
-      return accu;
-    }, []),
+    targets,
   }
 }
 
@@ -60,6 +71,7 @@ async function main() {
     url = content.nextUrl;
     result.push(...content.targets);
   }
+  console.log('result', result);
 
   const message = result.map(item => `${item.title}: ${item.url}<br/>`).join('<br/>');
   // sendMessage(message);
