@@ -1,9 +1,11 @@
 'use strict';
 require('dotenv').config();
 
+const axios = require('axios');
+const moment = require('moment');
+const schedule = require('node-schedule');
 const Crawler = require('crawler');
 const HTMLParser = require('node-html-parser');
-const axios = require('axios');
 
 const c = new Crawler({
     maxConnections: 1,
@@ -24,7 +26,6 @@ function parsePtt(content) {
     if (titleText?.includes('[標的]')) {
       const titleUrl = title?.getAttribute('href');
       const rank = post.querySelector('.nrec > span');
-      console.log(`[${rank?.text}]`, titleText, ':', titleUrl);
       accu.push({
         rank: rank?.text,
         url: titleUrl,
@@ -71,10 +72,13 @@ async function main() {
     url = content.nextUrl;
     result.push(...content.targets);
   }
-  console.log('result', result);
 
-  const message = result.map(item => `${item.title}: ${item.url}<br/>`).join('<br/>');
-  // sendMessage(message);
+  const message = result.map(item => `[${item?.rank}] ${item.title}: ${item.url}<br/>`).join('<br/>');
+  sendMessage(message);
 }
 
-main();
+const job = schedule.scheduleJob('0 0/30 9-14 ? * 1-5', () => {
+  console.log('job scheduleJob', moment());
+  main();
+});
+
