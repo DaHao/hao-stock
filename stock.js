@@ -28,7 +28,7 @@ function parsePtt(content) {
       const rank = post.querySelector('.nrec > span');
       accu.push({
         rank: rank?.text,
-        url: titleUrl,
+        url: `https://www.ptt.cc${titleUrl}`,
         title: titleText,
       });
     }
@@ -77,8 +77,7 @@ async function main() {
   sendMessage(message);
 }
 
-const job = schedule.scheduleJob('0 0/30 9-14 ? * 1-5', () => {
+const job = schedule.scheduleJob('0 30 9-18 ? * 1-5', () => {
   console.log('job scheduleJob', moment());
   main();
 });
-
